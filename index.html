@@ -304,24 +304,17 @@
           namePrefix: 'D-LAB',
         }],
         optionalServices: [batteryServiceUUID, mainServiceUUID]
-      }).then(device => {
-        add_tip('连接中')
-        return device.gatt.connect().then(async (s) => {
-          server = s
-          if (!server.disconnect) {
-            await server.connect()
-          }
-          return read_battery()
-        }).then(() => {
-          return read_strength()
-        }).then(() => {
+      }).then(async (device) => {
+        try {
+          add_tip('连接中')
+          server = await device.gatt.connect()
+          await read_battery()
+          await read_strength()
           add_tip('连接成功')
-        }).catch((e) => {
+        } catch (e) {
           add_tip('连接失败')
           console.error(e)
-        })
-
-
+        }
       }).catch(e => {
         add_tip('连接取消')
       })
@@ -335,22 +328,17 @@
     }
     window.onunload = disconnect
 
-    function read_battery() {
+    async function read_battery() {
       if (!server) {
         add_tip('未连接')
         return
       }
-      server.getPrimaryService(batteryServiceUUID).then(service => {
-        return service.getCharacteristic(batteryUUID)
-      }).then(batteryChar => {
-        return batteryChar.readValue()
-      }).then(data => {
-        let battery = data.getInt8()
-        console.log("电量:", battery);
-        document.getElementById('battery').innerHTML = battery + "";
-      }).catch(e => {
-        console.error(e);
-      })
+      let service = await server.getPrimaryService(batteryServiceUUID)
+      let batteryChar = await service.getCharacteristic(batteryUUID)
+      let data = await batteryChar.readValue()
+      let battery = data.getInt8()
+      console.log("电量:", battery);
+      document.getElementById('battery').innerHTML = battery + "";
     }
 
     async function read_strength(params) {
@@ -358,8 +346,8 @@
         add_tip('未连接')
         return
       }
-      let s = await server.getPrimaryService(mainServiceUUID)
-      let strengthChar = await s.getCharacteristic(strengthUUID)
+      let service = await server.getPrimaryService(mainServiceUUID)
+      let strengthChar = await service.getCharacteristic(strengthUUID)
       let data = await strengthChar.readValue()
       let res = (data.getUint8(2) << 16) + (data.getUint8(1) << 8) + data.getUint8()
       a_strength = Math.round((res >> 13) / 7)
@@ -369,12 +357,14 @@
     }
 
     async function write_strength(a, b) {
+      let flag = false;
+      if (a && b) flag = true;
       a = a || parseInt(document.getElementById('strength_a').value);
       b = b || parseInt(document.getElementById('strength_b').value);
 
-      a = a * 7;
-      b = b * 7;
-      if (a > 2047 || b > 2047) {
+      let data_a = a * 7;
+      let data_b = b * 7;
+      if (data_a > 2047 || data_b > 2047) {
         alert('强度不能大于 292')
         return
       }
@@ -389,11 +379,13 @@
       let s = await server.getPrimaryService(mainServiceUUID)
       let strengthChar = await s.getCharacteristic(strengthUUID)
 
-      let res = ((a << 11) + b) << 2;
+      let res = ((data_a << 11) + data_b) << 2;
       let value = switchEndian(res.toString(16))
       strengthChar.writeValueWithoutResponse(hexStringToUint8Array(value)).then(() => {
-        document.getElementById('strength_a').value = a
-        document.getElementById('strength_b').value = b
+        if (flag) {
+          document.getElementById('strength_a').value = a
+          document.getElementById('strength_b').value = b
+        }
         a_strength = a
         b_strength = b
         console.log('强度写入完成, a:', a, 'b:', b)
