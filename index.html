@@ -210,22 +210,65 @@
     const strengthUUID = "955a1504-0fe2-f5aa-a094-84b8d4f3e8ad"
     const AWaveUUID = "955a1506-0fe2-f5aa-a094-84b8d4f3e8ad"
     const BWaveUUID = "955a1505-0fe2-f5aa-a094-84b8d4f3e8ad"
-    const waveA = [
-      '210100',
-      '210102',
-      '210104',
-      '210106',
-      '210108',
-      '21010A',
-      '21010A',
-      '21010A',
-      '000000',
-      '000000',
-      '000000',
-      '000000'
-    ]
-
-    function hexStringToUint8Array(hexString) {
+    const waves = {
+      'a': [
+        '210100',
+        '210102',
+        '210104',
+        '210106',
+        '210108',
+        '21010A',
+        '21010A',
+        '21010A',
+        '000000',
+        '000000',
+        '000000',
+        '000000'
+      ],
+      'b': [
+        'C4080A',
+        '24080A',
+        '84070A',
+        '03070A',
+        '63060A',
+        'E3050A',
+        '43050A',
+        'A3040A',
+        '22040A',
+        '82030A',
+        '02030A',
+        '21010A',
+        '21010A',
+        '21010A',
+        '21010A',
+        '21010A',
+        '21010A',
+        '21010A',
+        '21010A'
+      ], 'c': [
+        '210100',
+        '618102',
+        'A10105',
+        'E18107',
+        '21020A',
+        '81020A',
+        'C1020A',
+        '010300',
+        '410300',
+        'A10300',
+        '210100',
+        '618102',
+        'A10105',
+        'E18107',
+        '21020A',
+        '81020A',
+        'C1020A',
+        '010300',
+        '410300',
+        'A10300'
+      ]
+    }
+    const hexStringToUint8Array = function (hexString) {
       if (hexString.length % 2 !== 0) {
         throw new Error('Hex字符串长度必须是偶数');
       }
@@ -236,8 +279,7 @@
       }
       return array;
     }
-
-    function switchEndian(str) {
+    const switchEndian = function (str) {
       if (str.length % 2 !== 0) {
         str = '0' + str
       }
@@ -252,8 +294,7 @@
         return str;
       }
     }
-
-    function worker_setup() {
+    const worker_setup = function () {
       let count = 0;
       let intervalId;
 
@@ -271,12 +312,12 @@
         }
       }
     }
-
-    function create_worker() {
+    const create_worker = function () {
       let blob = new Blob(['(' + worker_setup.toString() + ')()']);
       let url = window.URL.createObjectURL(blob);
       return new Worker(url);
     }
+
 
     let server;
     let worker = create_worker();
@@ -285,9 +326,13 @@
     let max_strength = 50;
     let tips = []
     let runner;
+    let selected_wave = 'b';
 
     function on_strength_max_input(e) {
       max_strength = parseInt(e.target.value);
+    }
+    function change_wave(e) {
+      selected_wave = e.target.value
     }
 
     worker.onmessage = function (e) {
@@ -410,8 +455,9 @@
     }
 
     async function setBT(count) {
-      let i = count % waveA.length;
-      let valueA = hexStringToUint8Array(waveA[i]);
+      let wave = waves[selected_wave] || waves['a'];
+      let i = count % wave.length;
+      let valueA = hexStringToUint8Array(wave[i]);
 
       let service = await server.getPrimaryService(mainServiceUUID)
       let characteristicA = await service.getCharacteristic(AWaveUUID)
@@ -494,6 +540,16 @@
       <input type="number" min="0" max="292" name="strength_max" id="strength_max" value="50"
         oninput="on_strength_max_input(event)">
     </label>
+    <br>
+    <label>
+      <span class="label">波形</span>
+      <select id="wave_select" name="wave_select" onchange="change_wave(event)">
+        <option value="a">A</option>
+        <option value="b" selected>B</option>
+        <option value="c">C</option>
+      </select>
+    </label>
+
   </from>
 
   <div class="offline">
